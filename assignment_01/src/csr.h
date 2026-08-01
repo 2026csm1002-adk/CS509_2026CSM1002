@@ -35,4 +35,4 @@ AdjacencyList readAdjacencyList(const string& path, bool weighted);
 // Converts the adjacency list graph into file format
 CSRGraph adjacencyListToCSR(const AdjacencyList& adjList);
 
-#endif::
+#endif
