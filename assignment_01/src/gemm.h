@@ -19,7 +19,12 @@ struct Matrix{
         return data[(size_t)i * cols + j];
     }
 
+    const double &at(int i, int j) const{
+        return data[(size_t)i * cols + j];
+    }
 };
 
+Matrix gemmSimple(const Matrix &A, const Matrix &B); // Simple Matrix Multiplication
+Matrix gemmBlocking(const Matrix &A, const Matrix &B, int blockSize); // For Matrix Multiplication using tiling
 
 #endif
