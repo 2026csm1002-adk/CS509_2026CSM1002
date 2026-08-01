@@ -2,7 +2,7 @@
 #include <algorithm>
 using namespace std;
 
-Matrix gemmSimple(const Matrix& A, const Matrix& B) {
+Matrix gemmSimple(const Matrix &A, const Matrix &B) {
     int M = A.rows, K = A.cols, N = B.cols;
     Matrix C(M, N);     // Declaring the resultant Matrix
 
@@ -17,7 +17,7 @@ Matrix gemmSimple(const Matrix& A, const Matrix& B) {
     return C;
 }
 
-Matrix gemmBlocking(const Matrix& A, const Matrix& B, int blockSize) {
+Matrix gemmBlocking(const Matrix &A, const Matrix &B, int blockSize) {
     int M = A.rows, K = A.cols, N = B.cols;
     Matrix C(M, N);
 
