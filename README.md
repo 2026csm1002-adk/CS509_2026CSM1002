@@ -160,7 +160,6 @@ g++ -O2 -std=c++17 -o driver\driver_csr.exe driver\driver_csr.cpp src\csr.cpp
 | csr_10_weighted.txt | 10 | 20 | Yes | 0.002 | ✅ Pass |
 
 ### Complexity
-### Complexity
 
 | Algorithm | Time Complexity | Space Complexity |
 |-----------|-----------------|------------------|
