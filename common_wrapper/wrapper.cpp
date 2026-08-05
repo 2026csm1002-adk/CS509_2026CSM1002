@@ -1,98 +1,224 @@
-#include <cstdlib>
+// Common Wrapper — repository-level menu for running the submitted
+// assignments. This does NOT shell out via system() to a separately-compiled
+// driver executable. Instead it links directly against gemm.cpp / csr.cpp
+// and calls their functions in-process. This avoids Windows cmd.exe's
+// quirky command-line quoting entirely, since no subprocess is ever spawned.
+//
+// Menu flow: Assignment -> Algorithm -> (pick a test file by number | Run ALL)
+//
+// Build (from the repository root):
+//   g++ -O2 -std=c++17 -o common_wrapper/wrapper.exe common_wrapper/wrapper.cpp assignment_01/src/gemm.cpp assignment_01/src/csr.cpp
+//
+// Run (from the repository root):
+//   .\common_wrapper\wrapper.exe
+
+#include "../assignment_01/src/gemm.h"
+#include "../assignment_01/src/csr.h"
+#include <algorithm>
+#include <chrono>
 #include <filesystem>
+#include <fstream>
+#include <functional>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 using namespace std;
 namespace fs = filesystem;
 
-struct AssignmentEntry {
-    string label;          // shown in the menu
-    string driverSrc;      // path to the driver .cpp
-    string extraSrc;       // path to the matching src/*.cpp implementation
-    string exeName;        // output executable name
-    string testsDir;       // where the test files live
-    vector<string> extraArgs; // extra args appended after the test file (GEMM -> block size(in blocking method))
+// ---------------------------------------------------------------------
+// GEMM: reads a matrix file, calls gemmSimple/gemmBlocking, times each,
+// prints results. Mirrors the logic that used to live in driver_gemm.cpp.
+// ---------------------------------------------------------------------
+static Matrix readMatrix(ifstream& in, int rows, int cols) {
+    Matrix m(rows, cols);
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            if (!(in >> m.at(i, j))) {
+                throw runtime_error("Malformed matrix data in input file.");
+            }
+        }
+    }
+    return m;
+}
+
+static void printMatrix(const Matrix& m) {
+    for (int i = 0; i < m.rows; ++i) {
+        for (int j = 0; j < m.cols; ++j) {
+            cout << m.at(i, j);
+            if (j + 1 < m.cols) cout << ' ';
+        }
+        cout << "\n";
+    }
+}
+
+static void runGemmOnFile(const string& path, int blockSize) {
+    ifstream in(path);
+    if (!in.is_open()) {
+        cout << "Error: could not open input file: " << path << "\n";
+        return;
+    }
+
+    int M, K, N;
+    if (!(in >> M >> K >> N)) {
+        cout << "Error: malformed header, expected 'M K N'.\n";
+        return;
+    }
+
+    Matrix A, B;
+    try {
+        A = readMatrix(in, M, K);
+        B = readMatrix(in, K, N);
+    } catch (const exception& e) {
+        cout << "Error: " << e.what() << "\n";
+        return;
+    }
+    // --- setup / parsing above this line is NOT timed ---
+
+    auto t1 = chrono::high_resolution_clock::now();
+    Matrix Csimple = gemmSimple(A, B);
+    auto t2 = chrono::high_resolution_clock::now();
+    double simpleMs = chrono::duration<double, milli>(t2 - t1).count();
+
+    auto t3 = chrono::high_resolution_clock::now();
+    Matrix Cblock = gemmBlocking(A, B, blockSize);
+    auto t4 = chrono::high_resolution_clock::now();
+    double blockMs = chrono::duration<double, milli>(t4 - t3).count();
+
+    cout << "Algorithm: GEMM Simple\n";
+    cout << "Result matrix:\n";
+    printMatrix(Csimple);
+    cout << "Execution time: " << simpleMs << " ms\n\n";
+
+    cout << "Algorithm: GEMM Blocking (block size = " << blockSize << ")\n";
+    cout << "Result matrix:\n";
+    printMatrix(Cblock);
+    cout << "Execution time: " << blockMs << " ms\n";
+}
+
+// ---------------------------------------------------------------------
+// CSR: reads a graph file, calls adjacencyListToCSR, times it, prints
+// row_ptr / col_idx / (values). Mirrors driver_csr.cpp.
+// ---------------------------------------------------------------------
+static void runCsrOnFile(const string& path, bool weighted) {
+    AdjacencyList adjList;
+    try {
+        adjList = readAdjacencyList(path, weighted);
+    } catch (const exception& e) {
+        cout << "Error: " << e.what() << "\n";
+        return;
+    }
+    // --- file reading / parsing above this line is NOT timed ---
+
+    auto t1 = chrono::high_resolution_clock::now();
+    CSRGraph csr = adjacencyListToCSR(adjList);
+    auto t2 = chrono::high_resolution_clock::now();
+    double convMs = chrono::duration<double, milli>(t2 - t1).count();
+
+    cout << "Algorithm: Adjacency-List to CSR Conversion\n";
+    cout << "Vertices (V): " << csr.V << "\n";
+    cout << "Stored directed arcs (E_csr): " << csr.E << "\n";
+    cout << "Weighted: " << (csr.weighted ? "yes" : "no") << "\n";
+
+    int previewCount = csr.V < 10 ? csr.V : 10;
+    cout << "row_ptr (first " << previewCount + 1 << "): ";
+    for (int i = 0; i <= previewCount; ++i) cout << csr.row_ptr[i] << ' ';
+    cout << "\n";
+
+    long long previewEdges = csr.E < 20 ? csr.E : 20;
+    cout << "col_idx (first " << previewEdges << "): ";
+    for (long long i = 0; i < previewEdges; ++i) cout << csr.col_idx[i] << ' ';
+    cout << "\n";
+
+    if (csr.weighted) {
+        cout << "values (first " << previewEdges << "): ";
+        for (long long i = 0; i < previewEdges; ++i) cout << csr.values[i] << ' ';
+        cout << "\n";
+    }
+
+    cout << "Conversion time: " << convMs << " ms\n";
+}
+
+// ---------------------------------------------------------------------
+// Menu structure: Assignment -> Algorithm -> (single test file | all).
+// New assignments/algorithms just get appended to buildCatalog() below.
+// ---------------------------------------------------------------------
+struct Algorithm {
+    string label;
+    string testsDir;                       // relative to the repo root (cwd when running the wrapper)
+    function<void(const string&)> runOne;  // runs the algorithm on one test file path
 };
 
-static vector<AssignmentEntry> buildCatalog() {
+struct AssignmentMenu {
+    string label;
+    vector<Algorithm> algorithms;
+};
+
+static vector<AssignmentMenu> buildCatalog() {
+    auto gemmRunner = [](const string& path) { runGemmOnFile(path, 32); };
+    auto csrRunner = [](const string& path) {
+        // Auto-detect weighted files by the "_weighted.txt" filename convention
+        // (e.g. csr_10_weighted.txt). Checking for the bare substring "weighted"
+        // would also match "unweighted", so this requires the "_weighted" form.
+        bool weighted = path.find("_weighted.txt") != string::npos;
+        runCsrOnFile(path, weighted);
+    };
+
     return {
-        {"Assignment 1 - GEMM (Simple + Blocking)",
-         "assignment_01/driver/driver_gemm.cpp",
-         "assignment_01/src/gemm.cpp",
-         "assignment_01/driver/driver_gemm",
-         "assignment_01/tests/gemm",
-         {"32"}},
-        {"Assignment 1 - CSR Graph Conversion",
-         "assignment_01/driver/driver_csr.cpp",
-         "assignment_01/src/csr.cpp",
-         "assignment_01/driver/driver_csr",
-         "assignment_01/tests/csr",
-         {}},
+        {"Assignment 1", {
+            {"GEMM (Simple + Blocking)", "assignment_01/tests/gemm", gemmRunner},
+            {"CSR Graph Conversion",     "assignment_01/tests/csr",  csrRunner},
+        }},
+        // To add Assignment 2 later, just append another entry here, e.g.:
+        // {"Assignment 2", {
+        //     {"BFS", "assignment_02/tests/bfs", bfsRunner},
+        //     {"DFS", "assignment_02/tests/dfs", dfsRunner},
+        //     {"SSSP", "assignment_02/tests/sssp", ssspRunner},
+        // }},
     };
 }
 
-static string nativePath(const string& p) {
-    return fs::path(p).make_preferred().string();
-}
-
-#ifdef _WIN32
-static const string kExeSuffix = ".exe";
-#else
-static const string kExeSuffix = "";
-#endif
-
-static int runSystem(const string& cmd) {
-#ifdef _WIN32
-    string wrapped = "\"" + cmd + "\"";
-    return system(wrapped.c_str());
-#else
-    return system(cmd.c_str());
-#endif
-}
-
-static bool compileDriver(const AssignmentEntry& e) {
-    ostringstream cmd;
-    cmd << "g++ -O2 -std=c++17 -o \"" << nativePath(e.exeName + kExeSuffix) << "\" \""
-        << nativePath(e.driverSrc) << "\" \"" << nativePath(e.extraSrc) << "\"";
-    cout << "Compiling: " << cmd.str() << "endl";
-    int rc = runSystem(cmd.str());
-    return rc == 0;
-}
-
-static void runOnFile(const AssignmentEntry& e, const string& testFile) {
-    ostringstream cmd;
-    cmd << "\"" << nativePath(e.exeName + kExeSuffix) << "\" \"" << nativePath(testFile) << "\"";
-    for (const auto& a : e.extraArgs) cmd << " " << a;
-    // The CSR driver needs --weighted for weighted test files
-    // File_format: <File_name>_weighted.txt
-    // E.g.: csr_10_weighted.txt). 
-    if (e.exeName.find("driver_csr") != string::npos &&
-        testFile.find("_weighted.txt") != string::npos) {
-        cmd << " --weighted";
-    }
-    cout << endl << "--- Running on " << testFile << " -------" << endl;
-    int rc = runSystem(cmd.str());
-    if (rc != 0) {
-        cerr << "Warning: run returned non-zero exit code for " << testFile << endl;
-    }
-}
-
-static void runAllTests(const AssignmentEntry& e) {
-    if (!fs::exists(e.testsDir)) {
-        cerr << "Error: tests directory not found: " << e.testsDir << endl;
+// Lists .txt files in algo.testsDir, lets the user pick one (or "all"),
+// and runs algo.runOne on the selected file(s).
+static void listAndRun(const Algorithm& algo) {
+    if (!fs::exists(algo.testsDir)) {
+        cerr << "Error: tests directory not found: " << algo.testsDir << "\n";
         return;
     }
-    bool anyRan = false;
-    for (const auto& entry : fs::directory_iterator(e.testsDir)) {
-        if (entry.path().extension() == ".txt") {
-            runOnFile(e, entry.path().string());
-            anyRan = true;
-        }
+
+    vector<fs::path> files;
+    for (const auto& entry : fs::directory_iterator(algo.testsDir)) {
+        if (entry.path().extension() == ".txt") files.push_back(entry.path());
     }
-    if (!anyRan) {
-        cerr << "No .txt test files found in " << e.testsDir << endl;
+    sort(files.begin(), files.end());
+
+    if (files.empty()) {
+        cerr << "No .txt test files found in " << algo.testsDir << "\n";
+        return;
+    }
+
+    cout << "\nTest files in " << algo.testsDir << ":\n";
+    for (size_t i = 0; i < files.size(); ++i) {
+        cout << "  " << (i + 1) << ") " << files[i].filename().string() << "\n";
+    }
+    size_t allOption = files.size() + 1;
+    cout << "  " << allOption << ") Run ALL test files\n";
+    cout << "Select an option (number): ";
+
+    size_t sel;
+    if (!(cin >> sel) || sel < 1 || sel > allOption) {
+        cerr << "Error: invalid selection.\n";
+        return;
+    }
+
+    if (sel == allOption) {
+        for (const auto& f : files) {
+            cout << "\n--- Running on " << f.string() << " ---\n";
+            algo.runOne(f.string());
+        }
+    } else {
+        const auto& f = files[sel - 1];
+        cout << "\n--- Running on " << f.string() << " ---\n";
+        algo.runOne(f.string());
     }
 }
 
@@ -100,54 +226,32 @@ int main() {
     auto catalog = buildCatalog();
 
     cout << "=== CS509 Common Wrapper ===\n";
-    cout << "Available algorithms/assignments:\n";
+    cout << "Available assignments:\n";
     for (size_t i = 0; i < catalog.size(); ++i) {
-        cout << "  " << (i + 1) << ") " << catalog[i].label << endl;
+        cout << "  " << (i + 1) << ") " << catalog[i].label << "\n";
     }
     cout << "Select an option (number): ";
 
-    int choice;
-    if (!(cin >> choice) || choice < 1 || (size_t)choice > catalog.size()) {
-        cerr << "Error: invalid selection." << endl;
+    size_t aSel;
+    if (!(cin >> aSel) || aSel < 1 || aSel > catalog.size()) {
+        cerr << "Error: invalid selection.\n";
         return 1;
     }
-    const AssignmentEntry& selected = catalog[choice - 1];
+    const AssignmentMenu& assignment = catalog[aSel - 1];
 
-    if (!fs::exists(selected.driverSrc) || !fs::exists(selected.extraSrc)) {
-        cerr << "Error: required source file missing for: " << selected.label  << endl;
-        return 1;
+    cout << "\nAvailable algorithms in " << assignment.label << ":\n";
+    for (size_t i = 0; i < assignment.algorithms.size(); ++i) {
+        cout << "  " << (i + 1) << ") " << assignment.algorithms[i].label << "\n";
     }
-    if (!compileDriver(selected)) {
-        cerr << "Error: compilation failed for: " << selected.label << endl;
-        return 1;
-    }
-
-    cout << "\nRun mode:\n";
-    cout << "  1) Run a single test file\n";
-    cout << "  2) Run all test files in " << selected.testsDir << endl;
     cout << "Select an option (number): ";
 
-    int mode;
-    if (!(cin >> mode)) {
-        cerr << "Error: invalid selection." << endl;
+    size_t algSel;
+    if (!(cin >> algSel) || algSel < 1 || algSel > assignment.algorithms.size()) {
+        cerr << "Error: invalid selection.\n";
         return 1;
     }
+    const Algorithm& algo = assignment.algorithms[algSel - 1];
 
-    if (mode == 1) {
-        cout << "Enter path to test file: ";
-        string path;
-        cin >> path;
-        if (!fs::exists(path)) {
-            cerr << "Error: test file not found: " << path << endl;
-            return 1;
-        }
-        runOnFile(selected, path);
-    } else if (mode == 2) {
-        runAllTests(selected);
-    } else {
-        cerr << "Error: invalid run mode." << endl;
-        return 1;
-    }
-
+    listAndRun(algo);
     return 0;
 }

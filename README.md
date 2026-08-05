@@ -47,7 +47,7 @@ CS509_2026CSM1002/
 Build (from the repository root):
 ```powershell
 cd common_wrapper
-g++ -O2 -std=c++17 -o wrapper.exe wrapper.cpp
+g++ -O2 -std=c++17 -o common_wrapper\wrapper.exe common_wrapper\wrapper.cpp assignment_01\src\gemm.cpp assignment_01\src\csr.cpp
 cd ..
 ```
 Run (from the repository root, not from inside common_wrapper):
