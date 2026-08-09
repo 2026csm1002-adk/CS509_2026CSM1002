@@ -23,17 +23,18 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto t1 = chrono::high_resolution_clock::now();
+    
     CSRGraph csr = adjacencyListToCSR(adjList);
-    int src = adjList.source;
-
-    BellmannFordResult result = bellmanFord(csr, src); 
+    int source = adjList.source;
+    
+    auto t1 = chrono::high_resolution_clock::now();
+    BellmanFordResult result = bellmanFord(csr, source); 
     auto t2 = chrono::high_resolution_clock::now();
 
     double ms = chrono::duration<double, milli>(t2 - t1).count();
 
     cout << "Algorithm: Bellman-Ford" << endl;
-    cout << "Source: " << src << endl;
+    cout << "Source: " << source << endl;
 
     if (result.negativeCycle) {
         cout << "Negative cycle: true" << endl;
