@@ -43,9 +43,9 @@ AdjacencyList readAdjacencyList(const string& path, bool weighted) {
                 if (!(in >> w)) {
                     throw runtime_error("Expected edge weight in file: " + path);
                 }
-                if (w <= 0.0) {
-                    throw runtime_error("Edge weights must be positive in file: " + path);
-                }
+                // if (w <= 0.0) {
+                //     throw runtime_error("Edge weights must be positive in file: " + path);
+                // } Removed due to assignment 2
             }
             result.adj[u].push_back({nbr, w});
         }
