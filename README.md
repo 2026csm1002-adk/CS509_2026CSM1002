@@ -242,16 +242,16 @@ g++ -O2 -std=c++17 -o driver\driver_fw.exe driver\driver_fw.cpp src\floyd_warsha
 |---|---|---|---|---|---|---|---|
 | Bellman-Ford | bf_10.txt | 10 | 33 | 9 | No | 0.0026 | ✅ Pass |
 | Bellman-Ford | bf_100.txt | 100 | 489 | 5 | No | 0.0905 | ✅ Pass |
-| Bellman-Ford | bf_10000.txt | 10000 | 49981 | 2881 | No | [FILL IN] | ✅ Pass |
-| Bellman-Ford | bf_50000.txt | 50000 | 199995 | 22858 | No | [FILL IN] | ✅ Pass |
-| Bellman-Ford | bf_100000.txt | 100000 | 399997 | 77221 | No | [FILL IN] | ✅ Pass |
-| Bellman-Ford | bf_negcycle_01.txt | 3 | 3 | 0 | Yes | [FILL IN] | ✅ Pass |
+| Bellman-Ford | bf_10000.txt | 10000 | 49981 | 2881 | No | 2227.14 | ✅ Pass |
+| Bellman-Ford | bf_50000.txt | 50000 | 199995 | 22858 | No | 50880.2 | ✅ Pass |
+| Bellman-Ford | bf_100000.txt | 100000 | 399997 | 77221 | No | 237097 | ✅ Pass |
+| Bellman-Ford | bf_negcycle_01.txt | 3 | 3 | 0 | Yes | 0.0006 | ✅ Pass |
 | Floyd-Warshall | fw_10.txt | 10 | — | N/A | No | 0.0084 | ✅ Pass |
 | Floyd-Warshall | fw_100.txt | 100 | — | N/A | No | 0.7635 | ✅ Pass |
-| Floyd-Warshall | fw_500.txt | 500 | — | N/A | No | [FILL IN] | ✅ Pass |
-| Floyd-Warshall | fw_1000.txt | 1000 | — | N/A | No | [FILL IN] | ✅ Pass |
-| Floyd-Warshall | fw_2000.txt | 2000 | — | N/A | No | [FILL IN] | ✅ Pass |
-| Floyd-Warshall | fw_negcycle_01.txt | 3 | — | N/A | Yes | [FILL IN] | ✅ Pass |
+| Floyd-Warshall | fw_500.txt | 500 | — | N/A | No | 28.9822 | ✅ Pass |
+| Floyd-Warshall | fw_1000.txt | 1000 | — | N/A | No | 221.686 | ✅ Pass |
+| Floyd-Warshall | fw_2000.txt | 2000 | — | N/A | No | 1720.68 | ✅ Pass |
+| Floyd-Warshall | fw_negcycle_01.txt | 3 | — | N/A | Yes | 0.0054 | ✅ Pass |
 
 ### Cross-Check: Bellman-Ford vs Floyd-Warshall (V=10, V=100)
 
