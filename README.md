@@ -22,11 +22,13 @@ This repository contains the implementations and test cases for all individual l
 
 ## Directory Structure
 
+## Directory Structure
+
 ```
 CS509_2026CSM1002/
 |-- README.md
 |-- common_wrapper/
-|   `-- wrapper.cpp              <- repo-level menu (build/run either driver)
+|   `-- wrapper.cpp              <- repo-level menu (build/run any driver)
 |-- assignment_01/
 |   |-- src/
 |   |   |-- gemm.h / gemm.cpp    <- GEMM simple + blocking implementations
@@ -37,21 +39,42 @@ CS509_2026CSM1002/
 |   |-- tests/
 |   |   |-- gemm/                <- gemm_test_01.txt ...
 |   |   `-- csr/                 <- csr_10.txt ... csr_100000.txt
-|   `-- outputs/                 <- (optional) saved run logs
+|                
+|-- assignment_02/
+|   |-- src/
+|   |   |-- bellman_ford.h / bellman_ford.cpp     <- Bellman-Ford (reuses assignment_01's CSR)
+|   |   `-- floyd_warshall.h / floyd_warshall.cpp <- Floyd-Warshall (dense matrix, no CSR)
+|   |-- driver/
+|   |   |-- driver_bf.cpp        <- Bellman-Ford driver
+|   |   `-- driver_fw.cpp        <- Floyd-Warshall driver
+|   |-- tests/
+|   |   |-- bf/                  <- bf_10.txt ... bf_100000.txt
+|   |   `-- fw/                  <- fw_10.txt ... fw_2000.txt
+|                   
+|-- assignment_03/
+|   |-- src/
+|   |   `-- mst.h / mst.cpp      <- Kruskal's and Prim's MST (reuses assignment_01's CSR)
+|   |-- driver/
+|   |   `-- driver_mst.cpp       <- MST driver (runs both algorithms on the same graph)
+|   |-- tests/
+|      `-- mst/                 <- mst_10.txt ... mst_100000.txt
+|                   
 `-- tools/
     |-- gen_gemm_test.cpp        <- generates random GEMM test files
-    `-- gen_graph.cpp            <- generates random graph test files
+    |-- gen_graph.cpp            <- generates random graph test files
+    |-- gen_bf_test.cpp          <- generates random Bellman-Ford test files
+    |-- gen_fw_test.cpp          <- generates random Floyd-Warshall test files
+    `-- gen_mst_test.cpp         <- generates random connected MST test files
 ```
 
 ## Common Wrapper: Build and Usage
 Build (from the repository root):
 ```powershell
 cd common_wrapper
-g++ -O2 -std=c++17 -o common_wrapper\wrapper.exe common_wrapper\wrapper.cpp assignment_01\src\gemm.cpp assignment_01\src\csr.cpp
-cd ..
-```
 ```powershell
-g++ -O2 -std=c++17 -o common_wrapper\wrapper.exe common_wrapper\wrapper.cpp assignment_01\src\gemm.cpp assignment_01\src\csr.cpp assignment_02\src\bellman_ford.cpp assignment_02\src\floyd_warshall.cpp
+g++ -O2 -std=c++17 -o common_wrapper\wrapper.exe common_wrapper\wrapper.cpp assignment_01\src\gemm.cpp assignment_01\src\csr.cpp assignment_02\src\bellman_ford.cpp assignment_02\src\floyd_warshall.cpp assignment_03\src\mst.cpp
+```
+cd ..
 ```
 Run (from the repository root, not from inside common_wrapper):
 ```powershell
@@ -281,5 +304,67 @@ algorithms at V=10 and V=100 so their outputs could be directly compared.
 - All Bellman-Ford and Floyd-Warshall test graphs (other than the
   deliberate negative-cycle cases) were generated as random DAGs, which
   guarantees no negative-weight cycle can occur by construction.
+
+
+## Assignment 03 — Minimum Spanning Tree (Kruskal and Prim)
+
+**Kruskal's Algorithm**: all edges are sorted by non-decreasing weight, then
+processed in that order. An edge is added to the MST only if its two
+endpoints are currently in different components, checked and merged via a
+Disjoint Set Union (Union-Find) structure with path compression and
+union-by-rank. Stops after V-1 edges have been selected.
+
+**Prim's Algorithm**: starts from vertex 0 and grows a single tree, using a
+min-priority queue keyed on edge weight. At each step, the cheapest edge
+connecting the current tree to a vertex outside it is selected and that
+vertex is added to the tree. Stops when all vertices are included.
+
+
+### Input Format
+
+#### MST (undirected, weighted; each edge appears at both endpoints)
+```text
+V E
+u0 degree neighbor1 weight1 neighbor2 weight2 ...
+...
+u(V-1) degree neighbor1 weight1 neighbor2 weight2 ...
+```
+`E` counts each undirected edge once. Weights may be positive, zero, or
+negative integers. The graph must be connected.
+
+### File Structure
+- `assignment_03/src/mst.h`, `mst.cpp` — Kruskal's and Prim's MST implementations
+- `assignment_03/driver/driver_mst.cpp` — reuses `assignment_01/src/csr.h`/`csr.cpp` for CSR conversion (not duplicated); runs both algorithms on the same CSR graph
+- `assignment_03/tests/mst/` — test files
+- `tools/gen_mst_test.cpp` — test-file generator (builds a random spanning tree first to guarantee connectivity, then adds extra random edges)
+
+
+### Compilation
+```powershell
+cd assignment_03
+g++ -O2 -std=c++17 -o driver\driver_mst.exe driver\driver_mst.cpp src\mst.cpp ..\assignment_01\src\csr.cpp
+```
+
+### Execution
+```powershell
+.\driver\driver_mst.exe tests\mst\mst_10.txt
+```
+
+### 9.1 MST Results Table
+
+| Test File | V | E | Kruskal Weight | Prim Weight | Kruskal Time (ms) | Prim Time (ms) | Equal? | Status |
+|---|---|---|---|---|---|---|---|---|
+| mst_10.txt | 10 | 15 | 150 | 150 | 0.0034| 0.0051 | Yes | ✅ Pass |
+| mst_100.txt | 100 | 200 | 1735 | 1735 | 0.0291 | 0.0668 | Yes | ✅ Pass |
+| mst_10000.txt | 10000 | 15000 | 189314 | 189314 | 3.0376 | 1.8295 | Yes | ✅ Pass |
+| mst_50000.txt | 50000 | 75000 | 935674 | 935674 | 24.7651 | 9.409 | Yes | ✅ Pass |
+| mst_100000.txt | 100000 | 150000 | 1873762 | 1873762 | 58.4767 | 17.1694 | Yes | ✅ Pass |
+
+### Complexity
+
+| Algorithm | Time Complexity | Space Complexity |
+|---|---|---|
+| Kruskal's MST | O(E log E) | O(V + E) |
+| Prim's MST | O(E log V) | O(V + E) |
 
 #### Links: [Assignment(Personal)](https://github.com/2026csm1002-adk/CS509_2026CSM1002)

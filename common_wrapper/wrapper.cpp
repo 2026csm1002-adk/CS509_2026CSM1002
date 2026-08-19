@@ -1,9 +1,5 @@
-// Common Wrapper — repository-level menu for running the submitted
-// assignments.
-// Menu flow: Assignment -> Algorithm -> (pick a test file by number | Run ALL)
-//
 // Build (from the repository root):
-//   g++ -O2 -std=c++17 -o common_wrapper/wrapper.exe common_wrapper/wrapper.cpp assignment_01/src/gemm.cpp assignment_01/src/csr.cpp assignment_02/src/bellman_ford.cpp assignment_02/src/floyd_warshall.cpp
+//   g++ -O2 -std=c++17 -o common_wrapper/wrapper.exe common_wrapper/wrapper.cpp assignment_01/src/gemm.cpp assignment_01/src/csr.cpp assignment_02/src/bellman_ford.cpp assignment_02/src/floyd_warshall.cpp assignment_03/src/mst.cpp
 //
 // Run (from the repository root):
 //   .\common_wrapper\wrapper.exe
@@ -12,6 +8,7 @@
 #include "../assignment_01/src/csr.h"
 #include "../assignment_02/src/bellman_ford.h"
 #include "../assignment_02/src/floyd_warshall.h"
+#include "../assignment_03/src/mst.h"
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -71,7 +68,6 @@ static void runGemmOnFile(const string& path, int blockSize) {
         cout << "Error: " << e.what() << "\n";
         return;
     }
-    // --- setup / parsing above this line is NOT timed ---
 
     auto t1 = chrono::high_resolution_clock::now();
     Matrix Csimple = gemmSimple(A, B);
@@ -106,7 +102,6 @@ static void runCsrOnFile(const string& path, bool weighted) {
         cout << "Error: " << e.what() << "\n";
         return;
     }
-    // --- file reading / parsing above this line is NOT timed ---
 
     auto t1 = chrono::high_resolution_clock::now();
     CSRGraph csr = adjacencyListToCSR(adjList);
@@ -121,17 +116,17 @@ static void runCsrOnFile(const string& path, bool weighted) {
     int previewCount = csr.V < 10 ? csr.V : 10;
     cout << "row_ptr (first " << previewCount + 1 << "): ";
     for (int i = 0; i <= previewCount; ++i) cout << csr.row_ptr[i] << ' ';
-    cout << endl;
+    cout << "\n";
 
     long long previewEdges = csr.E < 20 ? csr.E : 20;
     cout << "col_idx (first " << previewEdges << "): ";
     for (long long i = 0; i < previewEdges; ++i) cout << csr.col_idx[i] << ' ';
-    cout << endl;
+    cout << "\n";
 
     if (csr.weighted) {
         cout << "values (first " << previewEdges << "): ";
         for (long long i = 0; i < previewEdges; ++i) cout << csr.values[i] << ' ';
-        cout << endl;
+        cout << "\n";
     }
 
     cout << "Conversion time: " << convMs << " ms\n";
@@ -139,7 +134,8 @@ static void runCsrOnFile(const string& path, bool weighted) {
 
 // ---------------------------------------------------------------------
 // Bellman-Ford: reads a directed weighted adjacency-list file (weights may
-// be negative), converts to CSR via Assignment 1's shared helper
+// be negative), converts to CSR via Assignment 1's shared helper, times
+// only the algorithm call, prints per Assignment 2 Section 5.3.
 // ---------------------------------------------------------------------
 static void runBfOnFile(const string& path) {
     AdjacencyList adjList;
@@ -178,7 +174,9 @@ static void runBfOnFile(const string& path) {
 }
 
 // ---------------------------------------------------------------------
-// Floyd-Warshall: reads a dense V x V matrix file(NO CSR Involved).
+// Floyd-Warshall: reads a dense V x V matrix file (INF token for "no
+// edge"), times only the algorithm call, prints per Section 6.3. No CSR
+// involved — Floyd-Warshall is exempt from CSR conversion.
 // ---------------------------------------------------------------------
 static vector<vector<long long>> readMatrixFw(const string& path, int& V) {
     ifstream in(path);
@@ -213,7 +211,6 @@ static void runFwOnFile(const string& path) {
         cout << "Error: " << e.what() << "\n";
         return;
     }
-    // --- matrix loading above this line is NOT timed ---
 
     auto t1 = chrono::high_resolution_clock::now();
     FloydWarshallResult result = floydWarshall(mat);
@@ -241,6 +238,52 @@ static void runFwOnFile(const string& path) {
 }
 
 // ---------------------------------------------------------------------
+// MST: reads a weighted undirected adjacency-list file, converts to CSR,
+// runs BOTH Kruskal's and Prim's algorithms on the SAME CSR graph, times
+// each separately, prints both per Assignment 3 Section 5.3.
+// ---------------------------------------------------------------------
+static void printMSTResult(const string& label, const MSTResult& result, double ms) {
+    cout << "Algorithm: " << label << "\n";
+    cout << "MST edges:\n";
+    for (const auto& e : result.edges) {
+        cout << e.u << " " << e.v << " " << e.weight << "\n";
+    }
+    cout << "Total MST weight: " << result.totalWeight << "\n";
+    cout << "Execution time: " << ms << " ms\n";
+}
+
+static void runMstOnFile(const string& path) {
+    AdjacencyList adjList;
+    try {
+        adjList = readAdjacencyList(path, /*weighted=*/true);
+    } catch (const exception& e) {
+        cout << "Error: " << e.what() << "\n";
+        return;
+    }
+
+    CSRGraph csr = adjacencyListToCSR(adjList); // CSR conversion is NOT timed
+
+    auto t1 = chrono::high_resolution_clock::now();
+    MSTResult kruskalResult = kruskalMST(csr);
+    auto t2 = chrono::high_resolution_clock::now();
+    double kruskalMs = chrono::duration<double, milli>(t2 - t1).count();
+
+    auto t3 = chrono::high_resolution_clock::now();
+    MSTResult primResult = primMST(csr, 0);
+    auto t4 = chrono::high_resolution_clock::now();
+    double primMs = chrono::duration<double, milli>(t4 - t3).count();
+
+    printMSTResult("Kruskal's MST", kruskalResult, kruskalMs);
+    cout << "\n";
+    printMSTResult("Prim's MST", primResult, primMs);
+
+    if (kruskalResult.totalWeight != primResult.totalWeight) {
+        cerr << "Warning: Kruskal and Prim total weights disagree ("
+             << kruskalResult.totalWeight << " vs " << primResult.totalWeight << ")\n";
+    }
+}
+
+// ---------------------------------------------------------------------
 // Menu structure: Assignment -> Algorithm -> (single test file | all).
 // New assignments/algorithms just get appended to buildCatalog() below.
 // ---------------------------------------------------------------------
@@ -258,12 +301,15 @@ struct AssignmentMenu {
 static vector<AssignmentMenu> buildCatalog() {
     auto gemmRunner = [](const string& path) { runGemmOnFile(path, 32); };
     auto csrRunner = [](const string& path) {
-        // For weighted file e.g. csr_10_weighted.txt
+        // Auto-detect weighted files by the "_weighted.txt" filename convention
+        // (e.g. csr_10_weighted.txt). Checking for the bare substring "weighted"
+        // would also match "unweighted", so this requires the "_weighted" form.
         bool weighted = path.find("_weighted.txt") != string::npos;
         runCsrOnFile(path, weighted);
     };
     auto bfRunner = [](const string& path) { runBfOnFile(path); };
     auto fwRunner = [](const string& path) { runFwOnFile(path); };
+    auto mstRunner = [](const string& path) { runMstOnFile(path); };
 
     return {
         {"Assignment 1", {
@@ -274,6 +320,9 @@ static vector<AssignmentMenu> buildCatalog() {
             {"Bellman-Ford",   "assignment_02/tests/bf", bfRunner},
             {"Floyd-Warshall", "assignment_02/tests/fw", fwRunner},
         }},
+        {"Assignment 3", {
+            {"MST (Kruskal + Prim)", "assignment_03/tests/mst", mstRunner},
+        }},
     };
 }
 
@@ -281,7 +330,7 @@ static vector<AssignmentMenu> buildCatalog() {
 // and runs algo.runOne on the selected file(s).
 static void listAndRun(const Algorithm& algo) {
     if (!fs::exists(algo.testsDir)) {
-        cerr << "Error: tests directory not found: " << algo.testsDir << endl;
+        cerr << "Error: tests directory not found: " << algo.testsDir << "\n";
         return;
     }
 
@@ -292,19 +341,19 @@ static void listAndRun(const Algorithm& algo) {
     sort(files.begin(), files.end());
 
     if (files.empty()) {
-        cerr << "No .txt test files found in " << algo.testsDir << endl;
+        cerr << "No .txt test files found in " << algo.testsDir << "\n";
         return;
     }
 
     cout << "\nTest files in " << algo.testsDir << ":\n";
-    for (int i = 0; i < files.size(); ++i) {
+    for (size_t i = 0; i < files.size(); ++i) {
         cout << "  " << (i + 1) << ") " << files[i].filename().string() << "\n";
     }
-    int allOption = files.size() + 1;
+    size_t allOption = files.size() + 1;
     cout << "  " << allOption << ") Run ALL test files\n";
     cout << "Select an option (number): ";
 
-    int sel;
+    size_t sel;
     if (!(cin >> sel) || sel < 1 || sel > allOption) {
         cerr << "Error: invalid selection.\n";
         return;
@@ -327,12 +376,12 @@ int main() {
 
     cout << "=== CS509 Common Wrapper ===\n";
     cout << "Available assignments:\n";
-    for (int i = 0; i < catalog.size(); ++i) {
+    for (size_t i = 0; i < catalog.size(); ++i) {
         cout << "  " << (i + 1) << ") " << catalog[i].label << "\n";
     }
     cout << "Select an option (number): ";
 
-    int aSel;
+    size_t aSel;
     if (!(cin >> aSel) || aSel < 1 || aSel > catalog.size()) {
         cerr << "Error: invalid selection.\n";
         return 1;
@@ -340,12 +389,12 @@ int main() {
     const AssignmentMenu& assignment = catalog[aSel - 1];
 
     cout << "\nAvailable algorithms in " << assignment.label << ":\n";
-    for (int i = 0; i < assignment.algorithms.size(); ++i) {
+    for (size_t i = 0; i < assignment.algorithms.size(); ++i) {
         cout << "  " << (i + 1) << ") " << assignment.algorithms[i].label << "\n";
     }
     cout << "Select an option (number): ";
 
-    int algSel;
+    size_t algSel;
     if (!(cin >> algSel) || algSel < 1 || algSel > assignment.algorithms.size()) {
         cerr << "Error: invalid selection.\n";
         return 1;

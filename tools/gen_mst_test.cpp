@@ -8,6 +8,10 @@
 #include <vector>
 using namespace std;
 
+// g++ -O2 -std=c++17 -o gen_mst_test.exe gen_mst_test.cpp
+
+//  tools\gen_mst_test.exe 10 3 assignment_03\tests\mst\mst_10.txt 1
+//  tools\gen_mst_test.exe 100 4 assignment_03\tests\mst\mst_100.txt 2
 int main(int argc, char** argv) {
     if (argc < 4) {
         cerr << "Usage: " << argv[0] << " <V> <avg_degree> <output_file> [seed]\n";

@@ -19,7 +19,7 @@ static void printMSTResult(const string & label, const MSTResult &result, double
     }
 
     cout << "Total MST weight: " << result.totalWeight << endl;
-    cout << "Exceution time: " << ms << " ms" << endl; 
+    cout << "Execution time: " << ms << " ms" << endl; 
 }
 
 int main(int argc, char**argv){
