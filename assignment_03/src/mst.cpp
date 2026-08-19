@@ -32,6 +32,8 @@ struct DSU{
         int rootA = findParent(a);
         int rootB = findParent(b);
 
+        if(rootA == rootB) return false;
+
         if(rootA != rootB){
             if(rank[rootA] < rank[rootB]) parent[rootA] = rootB;
             else if(rank[rootA] > rank[rootB]) parent[rootB] = rootA;
@@ -40,6 +42,7 @@ struct DSU{
                 rank[rootA]++;
             } 
         }
+        return true;
         
     }
 };
@@ -53,7 +56,7 @@ MSTResult kruskalMST(const CSRGraph & csr){
             int v = csr.col_idx[i];
             long long weight = csr.values[i];
 
-            if(u < v) edges.emplace_back(u, v, weight);
+            if(u < v) edges.push_back({u, v, weight});
         }
     }
 
@@ -109,6 +112,6 @@ MSTResult primMST(const CSRGraph & csr, int startVertex){
                 pq.push({weight, v});
             }
         }
-        return result;
     }
+    return result;
 }
