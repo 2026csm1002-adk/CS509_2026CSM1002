@@ -56,6 +56,15 @@ AdjacencyList readAdjacencyList(const string& path, bool weighted) {
         if (tok == "SOURCE") {
             in >> result.source;
         }
+        else if(tok == "DAMPING"){
+            in >> result.damping;
+        }
+        else if(tok == "TOLERANCE"){
+            in >> result.tolerance;
+        }
+        else if(tok == "MAX_ITERATIONS"){
+            in >> result.maxIterations;
+        }
     }
 
     return result;

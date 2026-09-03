@@ -27,6 +27,12 @@ struct AdjacencyList{
     int source = 0;
     bool weighted = false;
     vector<vector<AdjEntry>> adj; // Each Adjacency entry will store the list of AdjEntry
+
+    // Optional Parameters for PageRank Algorithm
+
+    double damping = 0.85;
+    double tolerance = 1e-6;
+    int maxIterations = 1000;
 };
 
 // Reads the adjacency list graph in file format
