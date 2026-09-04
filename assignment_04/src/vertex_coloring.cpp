@@ -2,7 +2,8 @@
 #include <algorithm>
 #include <numeric>
 using namespace std;
-VertexColoringResult greedyVertexColoring(const CSRGraph& csr) {
+
+VertexColoringResult vertexColoring(const CSRGraph& csr) {
     int V = csr.V;
     VertexColoringResult result;
     result.color.assign(V, -1);
@@ -37,7 +38,7 @@ VertexColoringResult greedyVertexColoring(const CSRGraph& csr) {
     return result;
 }
 
-bool isValidColoring(const CSRGraph& csr, const std::vector<int>& color) {
+bool isValidColoring(const CSRGraph& csr, const vector<int>& color) {
     for (int u = 0; u < csr.V; ++u)
         for (long long e = csr.row_ptr[u]; e < csr.row_ptr[u + 1]; ++e)
             if (color[u] == color[csr.col_idx[e]]) return false;

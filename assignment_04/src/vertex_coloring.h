@@ -11,7 +11,7 @@ struct VertexColoringResult{
 };
 
 VertexColoringResult vertexColoring(const CSRGraph &csr);
-bool isValidColoring(const CSRGraph &csr, vector<int>&color);
+bool isValidColoring(const CSRGraph &csr, const vector<int>&color);
 bool hasSelfLoop(const CSRGraph& csr);
 
 #endif
