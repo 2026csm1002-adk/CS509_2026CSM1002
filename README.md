@@ -367,4 +367,133 @@ g++ -O2 -std=c++17 -o driver\driver_mst.exe driver\driver_mst.cpp src\mst.cpp ..
 | Kruskal's MST | O(E log E) | O(V + E) |
 | Prim's MST | O(E log V) | O(V + E) |
 
+
+## Assignment 04 - PageRank and Vertex Coloring
+
+### Algorithm / Approach
+
+**Vertex Coloring (Welsh-Powell)**: vertices are ordered by non-increasing
+degree (degree read directly from each vertex's CSR row length). Vertices
+are then processed in that order; each is assigned the smallest color index
+not already used by any of its already-colored neighbours.
+
+**PageRank**: each vertex starts at rank `1/N`. Every iteration, each
+vertex's current rank is pushed along its outgoing CSR edges to its
+neighbours (`contribution = damping * rank[u] / outdegree(u)`), added to a
+base value `(1-damping)/N` shared by all vertices. Dangling vertices
+(outdegree 0) have their rank redistributed evenly across all N vertices
+each iteration, instead of causing a divide-by-zero. Iteration stops when
+the total absolute change across all vertices falls at or below the
+tolerance, or `MAX_ITERATIONS` is reached.
+
+
+### Folder Structure
+
+```
+|-- assignment_04/
+|   |-- src/
+|   |   |-- vertex_coloring.h / vertex_coloring.cpp  <- Greedy Welsh-Powell coloring (reuses assignment_01's CSR)
+|   |   `-- pagerank.h / pagerank.cpp                <- PageRank (reuses assignment_01's CSR)
+|   |-- driver/
+|   |   |-- driver_vc.cpp        <- Vertex Coloring driver
+|   |   `-- driver_pagerank.cpp  <- PageRank driver
+|   |-- tests/
+|   |   |-- color/               <- color_10.txt ... color_100000.txt
+|   |   `-- pagerank/            <- pagerank_10.txt ... pagerank_50000.txt
+|   `-- outputs/                 <- (optional) saved run logs
+`-- tools/
+    |-- gen_gemm_test.cpp
+    |-- gen_graph.cpp
+    |-- gen_bf_test.cpp
+    |-- gen_fw_test.cpp
+    |-- gen_mst_test.cpp
+    |-- gen_color_test.cpp       <- generates random undirected graphs for Vertex Coloring
+    `-- gen_pagerank_test.cpp    <- generates random directed graphs for PageRank
+
+```
+## Common Wrapper: Build and Usage
+Build (from the repository root):
+```powershell
+g++ -O2 -std=c++17 -o common_wrapper\wrapper.exe common_wrapper\wrapper.cpp assignment_01\src\gemm.cpp assignment_01\src\csr.cpp assignment_02\src\bellman_ford.cpp assignment_02\src\floyd_warshall.cpp assignment_03\src\mst.cpp assignment_04\src\vertex_coloring.cpp assignment_04\src\pagerank.cpp
+```
+### Input Format
+
+#### Vertex Coloring (undirected, unweighted; each edge at both endpoints)
+```text
+V E
+u0 degree neighbor1 neighbor2 ...
+...
+u(V-1) degree neighbor1 neighbor2 ...
+```
+No self-loops permitted.
+
+#### PageRank (directed, unweighted; outgoing edges only)
+```text
+V E
+u0 outdegree neighbor1 neighbor2 ...
+...
+u(V-1) outdegree neighbor1 neighbor2 ...
+DAMPING d
+TOLERANCE epsilon
+MAX_ITERATIONS n
+```
+
+### File Structure
+- `assignment_04/src/vertex_coloring.h`, `vertex_coloring.cpp` — greedy coloring implementation
+- `assignment_04/src/pagerank.h`, `pagerank.cpp` — PageRank implementation
+- `assignment_04/driver/driver_vc.cpp` — reuses `assignment_01/src/csr.h`/`csr.cpp` (not duplicated); rejects self-loops before running
+- `assignment_04/driver/driver_pagerank.cpp` — reuses the same shared CSR module; the adjacency-list reader was extended to also parse `DAMPING`/`TOLERANCE`/`MAX_ITERATIONS` trailing lines (in addition to the existing `SOURCE` line used by earlier assignments)
+- `assignment_04/tests/color/`, `tests/pagerank/` — test files
+- `tools/gen_color_test.cpp`, `tools/gen_pagerank_test.cpp` — test-file generators
+
+### Compilation
+```powershell
+cd assignment_04
+g++ -O2 -std=c++17 -o driver\driver_vc.exe driver\driver_vc.cpp src\vertex_coloring.cpp ..\assignment_01\src\csr.cpp
+g++ -O2 -std=c++17 -o driver\driver_pagerank.exe driver\driver_pagerank.cpp src\pagerank.cpp ..\assignment_01\src\csr.cpp
+```
+
+### Execution
+```powershell
+.\driver\driver_vc.exe tests\color\color_10.txt
+.\driver\driver_pagerank.exe tests\pagerank\pagerank_10.txt
+```
+
+### 10.1 Vertex Coloring Results Table
+
+| File | V | E | Colors Used | Valid? | Time | Status |
+|---|---|---|---|---|---|---|
+| color_10.txt | 10 | 15 | 3 | Yes | 0.0033 ms | ✅ Pass |
+| color_100.txt | 100 | 200 | 4 | Yes | 0.0131 ms | ✅ Pass |
+| color_10000.txt | 10,000 | 15000 | 4 | Yes | 0.7813 ms | ✅ Pass |
+| color_50000.txt | 50,000 | 75000 | 5 | Yes | 4.0749 ms | ✅ Pass |
+| color_100000.txt | 100,000 | 150000 | 5 | Yes | 9.7767 ms | ✅ Pass |
+
+"Valid?" was checked programmatically (`isValidColoring`) for every run — no adjacent pair shares a color at any size.
+
+
+### 10.2 PageRank Results Table
+
+| File | V | E | Damping | Top Vertex | Sum of Ranks | Iter. / Time | Status |
+|---|---|---|---|---|---|---|---|
+| pagerank_10.txt | 10 | 30 | 0.85 | 4 | 1.000000 | 25 / 0.0054 ms | ✅ Pass |
+| pagerank_100.txt | 100 | 400 | 0.85 | 33 | 1.000000 | 18 / 0.0247 ms | ✅ Pass |
+| pagerank_1000.txt | 1,000 | 4000 | 0.85 | 720 | 1.000000 | 19 / 0.2149 ms | ✅ Pass |
+| pagerank_10000.txt | 10,000 | 30000 | 0.85 | 1237 | 1.000000 | 22 / 3.9772 ms | ✅ Pass |
+| pagerank_50000.txt | 50,000 | 150000 | 0.85 | 44059 | 1.000000 | 22 / 24.6967 ms | ✅ Pass |
+
+"Sum of Ranks" matched exactly `1.000000` at every size, confirming correctness of the dangling-vertex redistribution and the overall probability-mass invariant.
+
+### Complexity
+
+| Algorithm | Time Complexity | Space Complexity |
+|---|---|---|
+| Vertex Coloring (Welsh-Powell greedy) | O(V log V + E) | O(V) |
+| PageRank | O((V + E) × iterations) | O(V) |
+
+### Notes on the Assignment Specification
+- **The PageRank worked example in Section 6.3 of the assignment spec appears to contain an error.** Given the exact input graph in Section 6.2 (edges `0→1, 1→2, 2→0, 2→1, 3→2`), vertex 3 has zero in-degree — nothing in the graph points to it. Under the PageRank formula stated in the same spec (Section 2.2), a vertex with no incoming edges can only receive rank from the teleportation term, forcing `PR(3) = (1-d)/N = 0.0375` exactly, in any correct implementation. This was confirmed independently in both C++ and Python. The spec's claimed value of `0.208624` for vertex 3 is not reachable under the stated formula and input — this is being reported as a documentation discrepancy, not a bug in this implementation.
+- Vertex Coloring test graphs were generated via random edge sampling (no self-loops, no parallel edges); connectivity is not guaranteed but is not required by the spec.
+- PageRank test graphs were generated as random directed graphs; the dangling-vertex handling was separately verified on a hand-constructed 4-vertex test case with one dangling vertex, confirming `Sum of ranks` still equals exactly 1.0.
+
 #### Links: [Assignment(Personal)](https://github.com/2026csm1002-adk/CS509_2026CSM1002)
